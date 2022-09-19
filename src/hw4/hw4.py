@@ -4,7 +4,7 @@ import argparse
 from utils import classifyHomography, polyArea
 
 window_size = (640, 480)
-polygon_close_with_same_point_click = False # for macos
+polygon_close_with_same_point_click = True # for macos
 
 def on_mouse(event, x, y, buttons, user_param):
 
