@@ -1,1 +1,0 @@
-python hw4.py --select_mode classify_homography

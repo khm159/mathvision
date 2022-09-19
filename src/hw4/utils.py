@@ -13,7 +13,7 @@ class HomographyType(Enum):
     def __str__(self):
         return str(self.name)
 
-def explode_xy(xy):
+def get_x_y_list(xy):
     xl=[]
     yl=[]
     for i in range(len(xy)):
@@ -21,7 +21,7 @@ def explode_xy(xy):
         yl.append(xy[i][1])
     return xl,yl
 
-def shoelace_area(x_list,y_list):
+def shoelace_formula(x_list,y_list):
     a1,a2=0,0
     x_list.append(x_list[0])
     y_list.append(y_list[0])
@@ -31,20 +31,116 @@ def shoelace_area(x_list,y_list):
     l=abs(a1-a2)/2
     return l
 
-def classifyHomography(pts1, pts2):
+def get_homography_matrix(src, dst):
+    if not len(src) >= 4:
+        raise ("Source points must be >= 4")
+    if not len(dst) >= 4:
+        raise ("Target points must be >= 4")
+    if not len(src) == len(dst):
+        raise ("Num of Source and target poinst should be equal")
+    A = []
+    b = []
+    for i in range(len(src)):
+        s_x, s_y = src[i]
+        d_x, d_y = dst[i]
+        A.append([s_x, s_y, 1, 0, 0, 0, (-d_x)*(s_x), (-d_x)*(s_y)])
+        A.append([0, 0, 0, s_x, s_y, 1, (-d_y)*(s_x), (-d_y)*(s_y)])
+        b += [d_x, d_y]
+    A = np.array(A)
+    h = np.linalg.lstsq(A, b)[0]
+    h = np.concatenate((h, [1]), axis=-1)
+    return np.reshape(h, (3, 3))
+
+def check_reflection(pts):
     """
-    pts2 : unit
-    pts1 : points 
+    checking coordinates 
+    outer product is clock-wise (+)
     """
-    if len(pts1) != 4 or len(pts2) != 4: 
+    negative = 0
+    positive = 0
+    for i in range(len(pts)):
+        pt1 = pts[i-1]
+        pt2 = pts[i]
+        d = pt1[0]*pt2[1]-pt1[1]*pt2[0]
+        print(i,"~",i+1,d)
+        if d<0:
+            negative +=1
+        else:
+            positive +=1
+
+    if negative !=0 and positive !=0:
+        return False
+    else:
+        return True
+
+def CrossProduct(A):
+    X1 = (A[1][0] - A[0][0])
+    Y1 = (A[1][1] - A[0][1])
+    X2 = (A[2][0] - A[0][0])
+    Y2 = (A[2][1] - A[0][1])
+ 
+    # Return cross product
+    return (X1 * Y2 - Y1 * X2)
+
+def isConvex(points):
+    prev = 0
+    curr = 0
+    for i in range(len(points)):
+        temp = [
+            points[i], 
+            points[(i + 1) % len(points)],
+            points[(i + 2) % len(points)]
+        ]
+        # Update curr
+        curr = CrossProduct(temp)
+        # If curr is not equal to 0
+        if (curr != 0):
+            # If direction of cross product of
+            # all adjacent edges are not same
+            if (curr * prev < 0):
+                return False
+            else:
+                # Update curr
+                prev = curr
+    return True
+
+
+def check_concave(pts):
+
+    if area1 != area2:
+        return False
+    else:
+        return True
+
+
+def classifyHomography(source, target):
+    if len(source) != 4 or len(target) != 4: 
         return HomographyType.UNKNOWUN  
-    M = cv2.getPerspectiveTransform(pts1, pts2)
-    print(M)
-    return HomographyType.NORMAL
+
+    # toward original rect 
+    H = get_homography_matrix(source,target)
+
+    # check D 
+    D = H[0][0]*H[1][1] - H[0][1]*H[1][0]
+    
+    if not isConvex(source):
+        print("> is not convex : twisted or concave")
+        if check_concave(source):
+            return HomographyType.CONCAVE
+        else:
+            return HomographyType.TWIST
+    else:
+        print("> is convex : normal or reflection")
+        if D<0:  
+            print("D < 0 ")
+            return HomographyType.REFLECTION
+        else:
+            print("D > 0")
+            return HomographyType.NORMAL
 
 def polyArea(points):
-    xy_e=explode_xy(points)
-    area=shoelace_area(xy_e[0],xy_e[1])
+    xy_e=get_x_y_list(points)
+    area=shoelace_formula(xy_e[0],xy_e[1])
     print("- implemented : ", area)
     print("- using library : ", polyArea_geometry(points))
     return abs(area)
