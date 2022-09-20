@@ -51,28 +51,6 @@ def get_homography_matrix(src, dst):
     h = np.concatenate((h, [1]), axis=-1)
     return np.reshape(h, (3, 3))
 
-def check_reflection(pts):
-    """
-    checking coordinates 
-    outer product is clock-wise (+)
-    """
-    negative = 0
-    positive = 0
-    for i in range(len(pts)):
-        pt1 = pts[i-1]
-        pt2 = pts[i]
-        d = pt1[0]*pt2[1]-pt1[1]*pt2[0]
-        print(i,"~",i+1,d)
-        if d<0:
-            negative +=1
-        else:
-            positive +=1
-
-    if negative !=0 and positive !=0:
-        return False
-    else:
-        return True
-
 def CrossProduct(A):
     X1 = (A[1][0] - A[0][0])
     Y1 = (A[1][1] - A[0][1])
@@ -104,15 +82,26 @@ def isConvex(points):
                 prev = curr
     return True
 
-
-def check_concave(pts):
-
-    if area1 != area2:
-        return False
-    else:
+def check_twist(pts):
+    """
+    this is tricky.
+    ans as fall as i know 
+    therer are no optimum solution for this... 
+    one solution i found is below.
+    """
+    crosses = []
+    for i in range(len(pts)-1):
+        pt1 = np.append(pts[i-1],0)
+        pt2 = np.append(pts[i],0)
+        pt3 = np.append(pts[i+1],0)
+        cross = np.cross( pt2-pt1, pt3-pt1)
+        crosses.append(cross)
+    
+    if crosses[0][2] < 0 and crosses[1][2] <0 and crosses[2][2]>0:
         return True
-
-
+    else:
+        return False
+        
 def classifyHomography(source, target):
     if len(source) != 4 or len(target) != 4: 
         return HomographyType.UNKNOWUN  
@@ -125,10 +114,10 @@ def classifyHomography(source, target):
     
     if not isConvex(source):
         print("> is not convex : twisted or concave")
-        if check_concave(source):
-            return HomographyType.CONCAVE
-        else:
+        if check_twist(source):
             return HomographyType.TWIST
+        else:
+            return HomographyType.CONCAVE
     else:
         print("> is convex : normal or reflection")
         if D<0:  
