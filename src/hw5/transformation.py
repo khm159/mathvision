@@ -46,8 +46,28 @@ def get_optimal_homogeneous_transformation_matrix_3d(trans1, trans2, trans3):
         for j in range(B.shape[1]):
             B[i][j] -= B_bar[j]
     
-    sin_theta = \
-        (B) / ()
+    # A : p1, p2, p3 
+    # B : p1', p2', p3'
+
+    p1 = A[0]
+    p2 = A[1]
+    p3 = A[2]
+
+    p1_t = B[0]
+    p2_t = B[1]
+    p3_t = B[2]
+
+    p1p2 = p2-p1
+    p1p3 = p3-p1
+    
+    cross = np.cross(p1p2, p1p3)
+
+    p1p2_t = p2_t-p1_t
+    p1p3_t = p3_t-p1_t
+    
+    cross_t = np.cross(p1p2_t, p1p3_t)
+
+
 
     # # S = U D V^T
     # # H = (A - centroid_A,)(B - centroid_B)^T
