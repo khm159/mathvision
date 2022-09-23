@@ -1,95 +1,34 @@
 import cv2
+import math
 import numpy as np 
 
+def get_transformation(A, B):
 
-def get_centroid_of_vector(vecs):
-    """
-    input vec (numpy array)
-    """
-    xs = vecs[:,0]
-    ys = vecs[:,1]
-    zs = vecs[:,2]
-    xs_mean = np.mean(xs)
-    ys_mean = np.mean(ys)
-    zs_mean = np.mean(zs)
-    return np.array([xs_mean, ys_mean, zs_mean])
+    ## rigid body points A --> rigid body points B 
 
-def get_optimal_homogeneous_transformation_matrix_3d(trans1, trans2, trans3):
-    """
-    needs three mapping pair for dimension 3
-    trans1 [pt1, pt1']
-    trans1 [pt2, pt2']
-    trans1 [pt3, pt3']
-    """
-    # 1. get optimal R 
+    # 1. Remove translateion componment & get rotation 
+    # 1.1 find centroids 
 
-    # body points A --> body points B 
-    # RA + t = B (rigid body)
-    # suppose there are noise in each body points.
-    # R = Rotation movement, t = tparellel movement  
-    # A --> B 
-    
-    A = np.array([trans1[0], trans2[0], trans3[0]])
-    B = np.array([trans1[1], trans2[1], trans3[1]])
-    A_bar = get_centroid_of_vector(A)
-    B_bar = get_centroid_of_vector(B)
-  
-    # remove translation component 
-    # leaving on the rotation to deal with. 
-    # (A - centroid_A,)(B - centroid_B)^T
+    C_A = np.mean(A, axis=1).reshape(-1, 1)
+    C_B = np.mean(B, axis=1).reshape(-1, 1)
 
-    for i in range(A.shape[0]):
-        for j in range(A.shape[1]):
-            A[i][j] -= A_bar[j]
+    A_moved = A-C_A
+    B_moved = B-C_B
 
-    for i in range(B.shape[0]):
-        for j in range(B.shape[1]):
-            B[i][j] -= B_bar[j]
-    
-    # A : p1, p2, p3 
-    # B : p1', p2', p3'
+    H = A_moved @ np.transpose(B_moved)
 
-    p1 = A[0]
-    p2 = A[1]
-    p3 = A[2]
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
 
-    p1_t = B[0]
-    p2_t = B[1]
-    p3_t = B[2]
+    # special reflection case
+    # det(R) < R, reflection detected!, correcting for it
+    if np.linalg.det(R) < 0:
+        Vt[2,:] *= -1
+        R = Vt.T @ U.T
 
-    p1p2 = p2-p1
-    p1p3 = p3-p1
-    
-    cross = np.cross(p1p2, p1p3)
-
-    p1p2_t = p2_t-p1_t
-    p1p3_t = p3_t-p1_t
-    
-    cross_t = np.cross(p1p2_t, p1p3_t)
-
-
-
-    # # S = U D V^T
-    # # H = (A - centroid_A,)(B - centroid_B)^T
-    # # [U, S, V] = SVD(H)
-
-    # B = np.transpose(B)
-    # H = np.matmul(B)
-    # U, s, V = np.linalg.svd(H, full_matrices = True)
-
-    # # R = VU^T
-    # R = np.matmul(V, np.transpose(U))
-
-    # # 2. get t 
-    # # RxA + t = B 
-    # # 
-    # # now we know Rotation matrix then 
-    # # RXcentroid_A, + t = centroid B 
-    # # t = centroid_B - Rxcentroid_A
-
-    # t = B_bar - (np.matmul(R, A_bar))
-    # return R, t
-    
+    # 2. calculate translation t   
+    t = -R @ C_A + C_B
+    return R, t
 
 if __name__ == "__main__":
     # question 
@@ -111,15 +50,22 @@ if __name__ == "__main__":
     p4_t = np.array([1.4981, 0.8710, 2.8837])
     p5   = np.array([1, 1, 1])
 
-    trans1 = np.array([p1, p1_t])
-    trans2 = np.array([p2, p2_t])
-    trans3 = np.array([p3, p3_t])
+    A = np.array([
+        [p1[0], p2[0], p3[0]],
+        [p1[1], p2[1], p3[1]],
+        [p1[2], p2[2], p3[2]],
+    ])
+    B = np.array([
+        [p1_t[0], p2_t[0], p3_t[0]],
+        [p1_t[1], p2_t[1], p3_t[1]],
+        [p1_t[2], p2_t[2], p3_t[2]],
+    ])
 
-    get_optimal_homogeneous_transformation_matrix_3d(
-        trans1, trans2, trans3
-    )
-
-    # checking value is corerct 
-    # Rxp4 + t = p4'
-    # result = np.matmul(R, p4) + t 
-    # result = np.matmul(R, p1) + t 
+    R, t = get_transformation(A, B)
+    A = np.array([
+        [p4[0]],
+        [p4[1]],
+        [p4[2]]    
+    ])
+    B = (R@A) + t
+    print(B)
