@@ -68,4 +68,15 @@ if __name__ == "__main__":
         [p4[2]]    
     ])
     B = (R@A) + t
+    print("P4 결과값")
     print(B)
+
+    A = np.array([
+        [p5[0]],
+        [p5[1]],
+        [p5[2]]    
+    ])
+    B = (R@A) + t
+    print("P5 결과값")
+    print(B)
+
