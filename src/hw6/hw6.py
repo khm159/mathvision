@@ -61,28 +61,6 @@ def on_mouse(event, x, y, buttons, user_param):
         print("Resetting")
         reset()
 
-def fit_ellipse(x, y):
-    """
-    Fit the coefficients a,b,c,d,e,f, representing an ellipse described by
-    the formula F(x,y) = ax^2 + bxy + cy^2 + dx + ey + f = 0 to the provided
-    arrays of data points x=[x1, x2, ..., xn] and y=[y1, y2, ..., yn].
-    Based on the algorithm of Halir and Flusser, "Numerically stable direct
-    least squares fitting of ellipses'.
-    """
-    D1 = np.vstack([x**2, x*y, y**2]).T
-    D2 = np.vstack([x, y, np.ones(len(x))]).T
-    S1 = D1.T @ D1
-    S2 = D1.T @ D2
-    S3 = D2.T @ D2
-    T = -np.linalg.inv(S3) @ S2.T
-    M = S1 + S2 @ T
-    C = np.array(((0, 0, 2), (0, -1, 0), (2, 0, 0)), dtype=float)
-    M = np.linalg.inv(C) @ M
-    eigval, eigvec = np.linalg.eig(M)
-    con = 4 * eigvec[0]* eigvec[2] - eigvec[1]**2
-    ak = eigvec[:, np.nonzero(con > 0)[0]]
-    return np.concatenate((ak, T @ ak)).ravel()
-
 def get_center_radius_from_equation(rst):
     A = rst[0]
     B = rst[1]
@@ -93,24 +71,6 @@ def get_center_radius_from_equation(rst):
     r = math.sqrt((A*A) + (B*B) -(4*C))/2
     return x, y, r 
 
-def get_pinv_ellipse_impl(A):
-    # Singular-value decomposition
-    U, s, VT = np.linalg.svd(A)
-    # create m x n Sigma matrix
-    Sigma = np.zeros((A.shape[0], A.shape[1]))
-    # populate Sigma with n x n diagonal matrix
-    Sigma[:A.shape[0], :A.shape[0]] = np.diag(s)
-    # select
-    n_elements = 1 
-    Sigma = Sigma[:, :n_elements]
-    VT = VT[:n_elements, :]
-    # reconstruct
-    B = U.dot(Sigma.dot(VT))
-    # transform
-    T = U.dot(Sigma)
-    T = A.dot(VT.T)
-    return B
-
 def get_pinv_impl(A):
     U, s, VT = np.linalg.svd(A)
     d = 1.0 / s
@@ -119,7 +79,7 @@ def get_pinv_impl(A):
     B = VT.T.dot(D.T).dot(U.T)
     return B
         
-def get_optimal_circle(points):
+def get_least_circle(points):
     """
     get optimal circle with points 
     using SVD
@@ -159,17 +119,33 @@ def get_optimal_circle(points):
     x,y,r = get_center_radius_from_equation(rst)
     return x, y, r
 
-
-def get_optimal_ellipse(points):
+def get_least_ellipse(points):
     """
     get optimal ellipse with points 
     using SVD
     """
     print("get optimal ellipse")
     print("input points ", points)
-    # 1. checking determinant 
-    fit_ellipse(points[:,0], points[:,1])
-
+    # 1. checking determinant
+    x = []
+    y = []
+    for pt in points: 
+        x.append(pt[0])
+        y.append(pt[1])
+    N = len(x)
+    x = np.array(x, dtype=np.float64)
+    y = np.array(y, dtype=np.float64)
+    xmean = x.mean()
+    ymean = y.mean()
+    x = x-xmean
+    y = y-ymean
+    U, S, V = np.linalg.svd(np.stack((x, y)))
+    tt = np.linspace(0, 2*np.pi, 1000)
+    circle = np.stack((np.cos(tt), np.sin(tt)))    # unit circle
+    transform = np.sqrt(2/N) * U.dot(np.diag(S))   # transformation matrix
+    fit = transform.dot(circle) + np.array([[xmean], [ymean]])
+    return fit 
+    
 def App(args):
     """
     main App 
@@ -203,10 +179,14 @@ def App(args):
             cv2.putText(draw_frame, chr(65+i), point, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
         if done:
             if args.select_mode == "circle":
-                x,y,r = get_optimal_circle(points)
+                x,y,r = get_least_circle(points)
                 cv2.circle(draw_frame, (int(x),int(y)), int(r), (0,0,255))
             elif args.select_mode =="ellipse":
-                get_optimal_ellipse(points)
+                fit = get_least_ellipse(points)
+                fit_x = fit[0]
+                fit_y = fit[1]
+                for i in range(fit.shape[1]):
+                    cv2.circle(draw_frame, (int(fit_x[i]), int(fit_y[i])), 3, (0, 255, 255), -1 )
 
         cv2.imshow("HW6", draw_frame)
         if cv2.waitKey(50) == 27:
