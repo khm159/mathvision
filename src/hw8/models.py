@@ -1,10 +1,99 @@
+import os 
+import cv2
 import numpy as np
+import pickle
 
-from dataset import Dataset
+from dataset import Dataset_apple, Dataset_face
+
+class FaceRecognition(object):
+    def __init__(self, face_root, target_data, n_component=10,pre_extract_pca_dict=None):
+        self.data = Dataset_face(face_root)
+        self.n_component=n_component
+        self.pca_data_dict  = None
+        if pre_extract_pca_dict is not None:
+            self.pca_data_dict =  pickle.load(pre_extract_pca_dict)
+
+    def __call__(self):
+        print("Face analysis!")
+        if self.pca_data_dict is None:
+            self.faces_PCA()
+
+    def faces_PCA(self):
+        data_dict = self.data.data_dict
+        self.pca_data_dict = dict()
+        for key in self.data.subject_ids:
+            if key not in self.pca_data_dict.keys():
+                self.pca_data_dict[key] = dict()
+            data, P, D, PT  = self._PCA(
+                data_dict[key]
+            )
+            self.pca_data_dict[key]['eigenvalues'] = D
+            self.pca_data_dict[key]['eigenvectors'] = P
+            self.pca_data_dict[key]['eigenvectors_transpose'] = PT
+        with open('pca_data_dict.pkl','wb') as f:
+            pickle.dump(self.pca_data_dict,f)
+        
+    def _PCA(self, data):
+        """
+        input  : objection vectors 
+        output : principal componments  
+        """
+        data = self._whitening(data, show_statictics=False)
+        cov_matrix = np.cov(data.T)
+        eigs = np.linalg.eig(cov_matrix)
+        self.eigenvalues = eigs[0]
+        eigenvectors = eigs[1]
+        P = eigenvectors
+        D = np.diag(self.eigenvalues)
+        PT = P.T
+        # P^T*X
+        new_coordinate = self.new_coordinates(data, P)
+        index = self.eigenvalues.argsort()[::-1]
+        index = list(index)
+        for i in range(self.n_component):
+            if i==0:
+                new = [new_coordinate[:, index.index(i)]]
+            else:
+                new = np.concatenate(([new, [new_coordinate[:, index.index(i)]]]), axis=0)
+        return new.T, P, D, PT 
+    
+    @staticmethod
+    def _whitening(data, show_statictics=False):
+        """
+        z-score standalization 
+        input : np.array vecs 
+                shape = [num_sample, num_dim]
+        return : np.array scaled_vecs
+                shape = [num_sample, num_dim]
+        """
+        means = np.mean(data, axis=0, keepdims=True)
+        std   = np.std(data, axis=0, keepdims=True)
+        zero_meaned = data-means
+        z_standalized = zero_meaned/std
+        if show_statictics:
+            print("mean")
+            print(np.mean(z_standalized, axis=0, keepdims=True))
+            print("var")
+            print(np.var(z_standalized, axis=0, keepdims=True))
+            print("std")
+            print(np.std(z_standalized, axis=0, keepdims=True))
+        return z_standalized
+
+    @staticmethod
+    def new_coordinates(data, eigenvectors):
+        """
+        projection to eigenspace
+        """
+        for i in range(eigenvectors.shape[0]):
+            if i == 0:
+                new = [data.dot(eigenvectors.T[i])]
+            else:
+                new = np.concatenate((new, [data.dot(eigenvectors.T[i])]), axis=0)
+        return new.T
 
 class AppleClassification(object):
     def __init__(self, data_a, data_b, test):
-        self.data = Dataset(data_a, data_b, test)
+        self.data = Dataset_apple(data_a, data_b, test)
 
     def _PCA(self, data, n_componment=2):
         """
@@ -57,6 +146,7 @@ class AppleClassification(object):
                 new = np.concatenate(([new, [new_coordinate[:, index.index(i)]]]), axis=0)
         
         self.n_componment = n_componment
+        # =====================[sol.2]==============================
         return new.T
     
     def proj_eigenspace(self, data):
@@ -66,6 +156,7 @@ class AppleClassification(object):
         # projection to calculated eigenspace 
         data = self._whitening(data)
         new_coordinate = self.new_coordinates(data, self.P)
+        new_coordinate = new_coordinate[:,:self.n_componment]
         return new_coordinate
 
     def __call__(self):
@@ -94,17 +185,57 @@ class AppleClassification(object):
 
         print("\n    3. 2D-gaussian modeling")
         print("Apple A parameter ")
-        self.MVN_parameterization(reductioned_data_a)
+        mean_a, C_a = self.MVN_parameterization(reductioned_data_a)
         print("Apple B parameter ")
-        self.MVN_parameterization(reductioned_data_b)
+        mean_b, C_b = self.MVN_parameterization(reductioned_data_b)
 
         print("\n    4. Testset Classification")
         # 1. projection to subspace 
         test_set = self.proj_eigenspace(test_set)
+        self.visualization2(
+            reductioned_data_a, 
+            reductioned_data_b, 
+            test_set
+        )
+        distances = [] 
+        for data in test_set:
+            diss = []
+            dis_a = self.calculate_distance_mahalanobis(
+                mean_a, C_a, data
+            )
+            diss.append(dis_a)
+            dis_b = self.calculate_distance_mahalanobis(
+                mean_b, C_b, data
+            )
+            diss.append(dis_b)
+            distances.append(diss)
         
-        self.visualization2(reductioned_data_a, reductioned_data_b, test_set)
+        label = ['A', 'B']
+        for elem in distances:
+            pred = np.argmin(np.array(elem))
+            print(label[pred])
+            
+    def calculate_distance_mahalanobis(self, mean, cov, input_vec):
+        """
+        Sigma = cov 
+        
+        rout( (x - mean)^T * inv_cov * (x - mean)  )
+        input must be 1d vector
+        """
+        inv_cov = np.linalg.inv(cov)
 
-    
+        # X - mean (추정된 모수)
+        input_vec = input_vec - mean
+        input_vec = np.expand_dims(input_vec, axis=0)
+
+        # cov^-1 * (x-man)
+        l = np.dot(input_vec, inv_cov)
+
+        # 2-dim gaussian mahalanobis distance 
+        # rout( (x - mean)^T * inv_cov * (x - mean)  )
+        dist = np.sqrt(np.dot(l, input_vec.T).diagonal())
+        return dist
+        
     def MVN_parameterization(self,data):
         """
         parameterization multi-variate normal distribution 
@@ -122,6 +253,7 @@ class AppleClassification(object):
         print(" Cov Matrix")
         print(C)
         self.twoD_gaussian_heamat(mean_vec, C)
+        return mean_vec, C
         
     @staticmethod
     def visualization(a, b):
@@ -137,7 +269,6 @@ class AppleClassification(object):
         plt.scatter(b[:,0], b[:,1], s=10, c='blue')
         test_apple1 = test[0]
         test_apple2 = test[1]
-
         plt.scatter(test_apple1[0], test_apple1[1], s=50, c='green')
         plt.scatter(test_apple2[0], test_apple2[1], s=50, c='magenta')
         plt.show()

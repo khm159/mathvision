@@ -1,6 +1,71 @@
+import cv2
+import os 
 import numpy as np
 
-class Dataset():
+class Dataset_face():
+    def __init__(self, data_root):
+        """
+        input args : (str) data_root
+        """
+        self.root = data_root
+        data_list = os.listdir(data_root)
+        self.valid_ext = ["jpg", "png", "jpeg", "JPG", "PNG", "JPEG"]
+        self.data_list = []
+        for data in data_list:
+            if data.split(".")[1] in self.valid_ext:
+                self.data_list.append(data)
+        print(" {} faces founded.".format(len(self.data_list)))
+        self._load_imgs()
+        self.flatten()
+    
+    def _load_imgs(self):
+        self._img_list = []
+        self._data_dict = dict()
+        for img in self.data_list:
+            subject_id = int(img.split("s")[1].split("_")[0])
+            if subject_id not in self._data_dict.keys():
+                self._data_dict[subject_id] = []
+            img = cv2.imread(os.path.join(self.root, img))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)     
+            self._img_list.append(img)
+            self._data_dict[subject_id].append(img)
+        
+        self.subject_ids = list(self._data_dict.keys())
+        self.subject_ids.sort()
+        # for key in self.subject_ids:
+        #     print("[ID] ",key, " : ", len(self._data_dict[key]))
+    
+    def flatten(self):
+        for key in self.subject_ids:
+            self._data_dict[key] = self._flatten(self._data_dict[key])
+            #print(self._data_dict[key].shape)
+
+    @staticmethod
+    def _flatten(img_list):
+        vector_list = [] 
+        for img in img_list:
+            w, h = img.shape
+            vec = []
+            for i in range(w):
+                for j in range(h):
+                    vec.append(img[i][j])
+            vector_list.append(vec)
+        return np.array(vector_list)
+    
+    @property
+    def img_list(self):
+        return self._vector_list
+
+    @property
+    def vec_list(self):
+        return self._img_list
+
+    @property
+    def data_dict(self):
+        return self._data_dict
+
+
+class Dataset_apple():
     def __init__(self, data_a, data_b, test):
         """
         input args : (str) data_a 
