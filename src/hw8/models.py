@@ -1,5 +1,6 @@
 import os 
 import cv2
+import gc
 import numpy as np
 import pickle
 
@@ -40,6 +41,7 @@ class FaceRecognition(object):
         """
         data = self._whitening(data, show_statictics=False)
         cov_matrix = np.cov(data.T)
+        gc.collect()
         eigs = np.linalg.eig(cov_matrix)
         self.eigenvalues = eigs[0]
         eigenvectors = eigs[1]
