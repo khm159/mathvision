@@ -45,7 +45,7 @@
 
 |Numpy implementation|Usng library(sklearn)|
 |------|---|
-|![numpy_implementation_pca](figs/numpy_implementation_pca.png)|![Sklearn_implementation](src/hw8/figs/sklearn_implementation_pca.png)|
+|![numpy_implementation_pca](figs/numpy_implementation_pca.png)|![Sklearn_implementation](figs/sklearn_implementation_pca.png)|
 
 ***사과 품종 분포 추정 결과***
 
