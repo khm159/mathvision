@@ -75,4 +75,9 @@ result : A, B
 
 #### 실행 결과 
 
+
+***신원별 subspace projection in 2D-space***
+
+![distributions](figs/subspace_projection_in_2d.JPG)
+
 ------------------------------

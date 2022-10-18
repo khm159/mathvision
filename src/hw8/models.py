@@ -3,8 +3,11 @@ import cv2
 import gc
 import numpy as np
 import pickle
-
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm  
+from matplotlib.axes._axes import _log as matplotlib_axes_logger
 from dataset import Dataset_apple, Dataset_face
+matplotlib_axes_logger.setLevel('ERROR')
 
 class FaceRecognition(object):
     def __init__(self, face_root, target_data, n_component=10,pre_extract_pca_dict=None):
@@ -16,26 +19,66 @@ class FaceRecognition(object):
                 self.pca_data_dict = pickle.load(f)
 
     def __call__(self):
+        # 0. extract features 
         print("Face analysis!")
         if self.pca_data_dict is None:
-            self.faces_PCA()
-        print(self.pca_data_didct.keys())
+            self.faces_PCA_train()
+            
+        # 1. visualization 
+        self.visualize_faces2d()
 
-    def faces_PCA(self):
-        data_dict = self.data.data_dict
+
+    def visualize_faces2d(self):
+        imgs = self.data.data_dict['firstface']
+        eigen_vectors = self.pca_data_dict['eigenvectors']
+        colors = cm.rainbow(np.linspace(0, 1, len(self.data.subject_ids)))
+
+        for i, subject in enumerate(self.data.subject_ids):
+            # 1. proj 2-dim space
+            data = self.data.train[subject] # (9, 2576)
+            two_dim_coordinate = self.proj_eigenspace(
+                data = data,
+                tgt_eigenvector = eigen_vectors,
+                n_componment=2
+            )
+            plt.scatter(
+                two_dim_coordinate[:,0],
+                two_dim_coordinate[:,1], 
+                c = colors[i],
+                s = 10
+            )
+
+        plt.show()
+
+
+    def faces_PCA_train(self):
+        data_dict = self.data.train
         self.pca_data_dict = dict()
+
+        for i, key in enumerate(self.data.train.keys()):
+            if i ==0:
+                train_cat = self.data.train[key]
+            else:
+                train_cat = np.concatenate((train_cat, self.data.train[key]))
+
+        print("- Train data : ", train_cat.shape) # (360, 2576)
+        eigen_projected, P, D, PT  = self._PCA(train_cat)
+
+        self.pca_data_dict['eigenvalues'] = D
+        self.pca_data_dict['eigenvectors'] = P
+
         for key in self.data.subject_ids:
+            print("- ID[{}] observations for the parameterization : {}".format(key, self.data.train[key].shape))
             if key not in self.pca_data_dict.keys():
                 self.pca_data_dict[key] = dict()
-            data, P, D, PT  = self._PCA(
-                data_dict[key]
+
+            subject_train_data = self.data.train[key]
+            subject_proj_data = self.new_coordinates(subject_train_data, P)
+            mean_face, Cov_face = self.MVN_parameterization(
+                subject_proj_data
             )
-            # 모수 추정 
-            mean_face, Cov_face = self.MVN_parameterization(data)
-            self.pca_data_dict[key]['eigenvalues'] = D
-            self.pca_data_dict[key]['eigenvectors'] = P
-            self.pca_data_dict[key]['mean'] = P
-            self.pca_data_dict[key]['cov'] = P
+            self.pca_data_dict[key]['mean'] = mean_face
+            self.pca_data_dict[key]['cov'] = Cov_face
 
         with open('pca_data_dict.pkl','wb') as f:
             pickle.dump(self.pca_data_dict,f)
@@ -64,16 +107,24 @@ class FaceRecognition(object):
             else:
                 new = np.concatenate(([new, [new_coordinate[:, index.index(i)]]]), axis=0)
         return new.T, P, D, PT 
-    
-    @staticmethod
-    def proj_eigenspace(self, data, tgt_eigenvector):
+
+    def proj_eigenspace(self, data, tgt_eigenvector, n_componment):
         """
         projection to eigenspace
         """
         # projection to calculated eigenspace 
-        data = self._whitening(data)
+        #data = self._whitening(data)
+
+        # P^T*X
         new_coordinate = self.new_coordinates(data, tgt_eigenvector)
-        new_coordinate = new_coordinate[:,:self.n_componment]
+
+        index = self.eigenvalues.argsort()[::-1]
+        index = list(index)
+        for i in range(n_componment):
+            if i==0:
+                new = [new_coordinate[:, index.index(i)]]
+            else:
+                new = np.concatenate(([new, [new_coordinate[:, index.index(i)]]]), axis=0)
         return new_coordinate
 
     @staticmethod
@@ -219,7 +270,6 @@ class AppleClassification(object):
 
         print("\n   2. Perform PCA toward all data")
         reductioned_data = self._PCA(data_cat)
-        #reductioned_data = self._PCA_lib(data_cat) 
         print("- Reductioned Apple : ", reductioned_data.shape)
 
         print("\n   3. Visualization")

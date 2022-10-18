@@ -17,28 +17,46 @@ class Dataset_face():
         print(" {} faces founded.".format(len(self.data_list)))
         self._load_imgs()
         self.flatten()
+        self._split()
     
     def _load_imgs(self):
         self._img_list = []
         self._data_dict = dict()
+        self._data_dict['firstface'] = []
         for img in self.data_list:
             subject_id = int(img.split("s")[1].split("_")[0])
+            img = cv2.imread(os.path.join(self.root, img))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   
+
             if subject_id not in self._data_dict.keys():
                 self._data_dict[subject_id] = []
-            img = cv2.imread(os.path.join(self.root, img))
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)     
+                self._data_dict['firstface'].append(img) 
+
             self._img_list.append(img)
             self._data_dict[subject_id].append(img)
         
-        self.subject_ids = list(self._data_dict.keys())
-        self.subject_ids.sort()
-        # for key in self.subject_ids:
-        #     print("[ID] ",key, " : ", len(self._data_dict[key]))
+        keys = list(self._data_dict.keys())
+        self.subject_ids = [x for x in keys if "firstface" not in str(x)]
+    
+    def _split(self):
+        self._train = dict()
+        self._test  = dict()
+        for id in self.subject_ids:
+            subject_data = self.data_dict[id]
+            num_face = subject_data.shape[0]
+            self._train[id] = []
+            self._test[id] = []
+            for i in range(num_face):
+                if i ==0:
+                    self._test[id].append(subject_data[i])
+                else:
+                    self._train[id].append(subject_data[i])
+            self._train[id] = np.array(self._train[id])
+            self._test[id] = np.array(self._test[id])
     
     def flatten(self):
         for key in self.subject_ids:
             self._data_dict[key] = self._flatten(self._data_dict[key])
-            #print(self._data_dict[key].shape)
 
     @staticmethod
     def _flatten(img_list):
@@ -64,6 +82,13 @@ class Dataset_face():
     def data_dict(self):
         return self._data_dict
 
+    @property
+    def train(self):
+        return self._train  
+
+    @property
+    def test(self):
+        return self._test
 
 class Dataset_apple():
     def __init__(self, data_a, data_b, test):
