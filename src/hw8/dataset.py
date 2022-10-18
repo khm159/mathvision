@@ -27,6 +27,7 @@ class Dataset_face():
             subject_id = int(img.split("s")[1].split("_")[0])
             img = cv2.imread(os.path.join(self.root, img))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   
+            self.w, self.h = img.shape
 
             if subject_id not in self._data_dict.keys():
                 self._data_dict[subject_id] = []
@@ -72,10 +73,6 @@ class Dataset_face():
     
     @property
     def img_list(self):
-        return self._vector_list
-
-    @property
-    def vec_list(self):
         return self._img_list
 
     @property
