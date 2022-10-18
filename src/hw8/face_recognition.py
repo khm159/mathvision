@@ -6,7 +6,7 @@ def main():
     exp = FaceRecognition(
         face_root="data/att_faces",
         target_data = "myface.png",
-        pre_extract_pca_dict = None,
+        pre_extract_pca_dict = "pca_data_dict.pkl",
     )
     exp()
 

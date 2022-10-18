@@ -27,29 +27,33 @@ class FaceRecognition(object):
         # 1. visualization 
         self.visualize_faces2d()
 
-
     def visualize_faces2d(self):
-        imgs = self.data.data_dict['firstface']
-        eigen_vectors = self.pca_data_dict['eigenvectors']
         colors = cm.rainbow(np.linspace(0, 1, len(self.data.subject_ids)))
 
+        num_train_per_id = 9
+        data = self.pca_data_dict['proj'][:,:2]
         for i, subject in enumerate(self.data.subject_ids):
-            # 1. proj 2-dim space
-            data = self.data.train[subject] # (9, 2576)
-            two_dim_coordinate = self.proj_eigenspace(
-                data = data,
-                tgt_eigenvector = eigen_vectors,
-                n_componment=2
-            )
-            plt.scatter(
-                two_dim_coordinate[:,0],
-                two_dim_coordinate[:,1], 
-                c = colors[i],
-                s = 10
-            )
-
+            for j in range(num_train_per_id):
+                # 1. proj 2-dim space
+                proj_face_vec = data[i*num_train_per_id+j]
+                plt.scatter(
+                    proj_face_vec[0],
+                    proj_face_vec[1], 
+                    c = colors[i],
+                    s = 10
+                )
         plt.show()
 
+    @staticmethod
+    def _PCA_lib(data, n_componment=2, show_eigenvalues=False):
+        """
+        ONLY USE for checking (모수 저장안함)
+        """
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=2)
+        pca.fit(data)
+        X_pca = pca.transform(data)
+        return X_pca
 
     def faces_PCA_train(self):
         data_dict = self.data.train
@@ -66,6 +70,7 @@ class FaceRecognition(object):
 
         self.pca_data_dict['eigenvalues'] = D
         self.pca_data_dict['eigenvectors'] = P
+        self.pca_data_dict['proj'] = eigen_projected
 
         for key in self.data.subject_ids:
             print("- ID[{}] observations for the parameterization : {}".format(key, self.data.train[key].shape))
@@ -90,7 +95,6 @@ class FaceRecognition(object):
         """
         data = self._whitening(data, show_statictics=False)
         cov_matrix = np.cov(data.T)
-        gc.collect()
         eigs = np.linalg.eig(cov_matrix)
         self.eigenvalues = eigs[0]
         eigenvectors = eigs[1]
@@ -113,7 +117,7 @@ class FaceRecognition(object):
         projection to eigenspace
         """
         # projection to calculated eigenspace 
-        #data = self._whitening(data)
+        data = self._whitening(data)  
 
         # P^T*X
         new_coordinate = self.new_coordinates(data, tgt_eigenvector)
