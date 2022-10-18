@@ -45,16 +45,16 @@
 
 |Numpy implementation|Usng library(sklearn)|
 |------|---|
-|![numpy_implementation_pca](hw8/figs/numpy_implementation_pca.png)|![Sklearn_implementation](src/hw8/figs/sklearn_implementation_pca.png)|
+|![numpy_implementation_pca](figs/numpy_implementation_pca.png)|![Sklearn_implementation](src/hw8/figs/sklearn_implementation_pca.png)|
 
 ***사과 품종 분포 추정 결과***
 
-![distributions](hw8/figs/parameterized_distributions.png)
+![distributions](figs/parameterized_distributions.png)
 
 
 ***테스트셋 분류 결과***
 
-![test_set](hw8/figs/testset_result.png)
+![test_set](figs/testset_result.png)
 
 result : A, B
 
