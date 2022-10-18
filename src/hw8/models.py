@@ -12,12 +12,14 @@ class FaceRecognition(object):
         self.n_component=n_component
         self.pca_data_dict  = None
         if pre_extract_pca_dict is not None:
-            self.pca_data_dict =  pickle.load(pre_extract_pca_dict)
+            with open('pca_data_dict.pkl','rb') as f:
+                self.pca_data_dict = pickle.load(f)
 
     def __call__(self):
         print("Face analysis!")
         if self.pca_data_dict is None:
             self.faces_PCA()
+        print(self.pca_data_didct.keys())
 
     def faces_PCA(self):
         data_dict = self.data.data_dict
@@ -28,9 +30,13 @@ class FaceRecognition(object):
             data, P, D, PT  = self._PCA(
                 data_dict[key]
             )
+            # 모수 추정 
+            mean_face, Cov_face = self.MVN_parameterization(data)
             self.pca_data_dict[key]['eigenvalues'] = D
             self.pca_data_dict[key]['eigenvectors'] = P
-            self.pca_data_dict[key]['eigenvectors_transpose'] = PT
+            self.pca_data_dict[key]['mean'] = P
+            self.pca_data_dict[key]['cov'] = P
+
         with open('pca_data_dict.pkl','wb') as f:
             pickle.dump(self.pca_data_dict,f)
         
@@ -59,6 +65,44 @@ class FaceRecognition(object):
                 new = np.concatenate(([new, [new_coordinate[:, index.index(i)]]]), axis=0)
         return new.T, P, D, PT 
     
+    @staticmethod
+    def proj_eigenspace(self, data, tgt_eigenvector):
+        """
+        projection to eigenspace
+        """
+        # projection to calculated eigenspace 
+        data = self._whitening(data)
+        new_coordinate = self.new_coordinates(data, tgt_eigenvector)
+        new_coordinate = new_coordinate[:,:self.n_componment]
+        return new_coordinate
+
+    @staticmethod
+    def new_coordinates(data, eigenvectors):
+        """
+        projection to eigenspace
+        """
+        for i in range(eigenvectors.shape[0]):
+            if i == 0:
+                new = [data.dot(eigenvectors.T[i])]
+            else:
+                new = np.concatenate((new, [data.dot(eigenvectors.T[i])]), axis=0)
+        return new.T
+
+    @staticmethod
+    def MVN_parameterization(data):
+        """
+        parameterization multi-variate normal distribution 
+        from the input vectors 
+        """
+        data = data.T
+        num_dim = data.shape[1]
+        num_observation = data.shape[0]
+        mean_vec = np.mean(data, axis=1)
+        data = data - np.expand_dims(mean_vec,axis=1)
+        data_T = data.T
+        C = np.matmul(data, data.T)/(num_observation-1)
+        return mean_vec, C
+
     @staticmethod
     def _whitening(data, show_statictics=False):
         """
