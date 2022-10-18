@@ -76,8 +76,9 @@ result : A, B
 #### 실행 결과 
 
 
-***신원별 subspace projection in 2D-space***
+***k-reconstruction***
 
-![distributions](figs/subspace_projection_in_2d.JPG)
+|1|10|100|200|
+|------|---|---|---|
+|![1](eigenfaces/eigen_k[1].png)|![2](eigenfaces/eigen_k[10].png)|![3](eigenfaces/eigen_k[100].png)|![4](eigenfaces/eigen_k[200].png)|
 
-------------------------------
